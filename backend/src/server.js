@@ -1,6 +1,6 @@
 const express = require('express');
 const cors = require('cors');
-const lunar = require('chinese-lunar-calendar');
+const LunarCalendar = require('lunar-calendar');
 
 const app = express();
 app.use(cors());
@@ -9,77 +9,52 @@ app.use(express.json());
 const tiangan = ['甲', '乙', '丙', '丁', '戊', '己', '庚', '辛', '壬', '癸'];
 const dizhi = ['子', '丑', '寅', '卯', '辰', '巳', '午', '未', '申', '酉', '戌', '亥'];
 
-// 修复1：添加详细的错误日志
-const getShiChen = (hour) => {
-  console.log(`处理时辰计算，输入小时: ${hour}`);
-  return Math.floor((hour + 1) / 2) % 12;
-};
-
-// 修复2：完整的农历转换逻辑
 app.post('/api/bazi', (req, res) => {
   try {
-    console.log('收到请求:', req.body);
-    
     const { birthdate, birthtime } = req.body;
     const [year, month, day] = birthdate.split('-').map(Number);
-    const [hour, minute] = birthtime.split(':').map(Number);
+    const [hour] = birthtime.split(':').map(Number);
 
-    // 修复3：验证日期有效性
-    if (isNaN(year) || isNaN(month) || isNaN(day)) {
-      throw new Error('无效的日期格式，请使用YYYY-MM-DD');
-    }
+    // 農曆轉換
+    const lunarDate = LunarCalendar.solarToLunar(year, month, day);
+    if (!lunarDate) throw new Error('農曆轉換失敗');
 
-    const lunarDate = lunar.solarToLunar(year, month, day);
-    console.log('农历转换结果:', lunarDate);
+    // 年柱計算
+    const yearGZ = LunarCalendar.getYearGanZhi(year);
+    const yearPillar = tiangan[yearGZ[0]] + dizhi[yearGZ[1]];
 
-    // 修复4：处理年份干支计算
-    const yearGZ = lunar.getYearGZ(year);
-    const yearPillar = tiangan[yearGZ.tg] + dizhi[yearGZ.dz];
+    // 月柱計算
+    const monthGZ = LunarCalendar.getMonthGanZhi(year, month, day);
+    const monthPillar = tiangan[monthGZ[0]] + dizhi[monthGZ[1]];
 
-    // 修复5：精确的月柱计算
-    const monthGZ = lunar.getMonthGZ(year, month, day);
-    const monthPillar = tiangan[monthGZ.tg] + dizhi[monthGZ.dz];
+    // 日柱計算
+    const dayGZ = LunarCalendar.getDayGanZhi(year, month, day);
+    const dayPillar = tiangan[dayGZ[0]] + dizhi[dayGZ[1]];
 
-    // 修复6：日柱计算
-    const dayGZ = lunar.getDayGZ(year, month, day);
-    const dayPillar = tiangan[dayGZ.tg] + dizhi[dayGZ.dz];
-
-    // 修复7：修正时干计算逻辑
-    const shichenIndex = getShiChen(hour);
+    // 時柱計算
+    const shichenIndex = Math.floor((hour + 1) / 2) % 12;
     const timeZhi = dizhi[shichenIndex];
-    const dayGanIndex = dayGZ.tg;
-    const timeGanIndex = (dayGanIndex % 5) * 2 + shichenIndex;
-    const timeGan = tiangan[timeGanIndex % 10];
+    const timeGan = tiangan[(dayGZ[0] % 5) * 2 + shichenIndex % 10];
     const timePillar = timeGan + timeZhi;
-
-    console.log('计算结果:', {
-      yearPillar,
-      monthPillar,
-      dayPillar,
-      timePillar
-    });
 
     res.json({
       bazi: {
-        year: yearPillar,
-        month: monthPillar,
-        day: dayPillar,
-        time: timePillar
+        年柱: yearPillar,
+        月柱: monthPillar,
+        日柱: dayPillar,
+        時柱: timePillar
       },
-      lunar: lunarDate
+      農曆: `農曆${lunarDate.lYear}年${lunarDate.lMonth}月${lunarDate.lDay}日`
     });
 
   } catch (error) {
-    // 修复8：返回详细错误信息
-    console.error('服务器错误:', error.stack);
+    console.error('伺服器錯誤:', error);
     res.status(500).json({
-      error: '内部服务器错误',
-      message: error.message,
-      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+      錯誤: '內部伺服器錯誤',
+      訊息: error.message
     });
   }
 });
 
-// 修复9：确认端口配置
-const PORT = process.env.PORT || 5001;
-app.listen(PORT, () => console.log(`后端运行在 http://localhost:${PORT}`));
+const PORT = 5001;
+app.listen(PORT, () => console.log(`後端運行於 http://localhost:${PORT}`));

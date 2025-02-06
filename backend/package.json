@@ -10,8 +10,8 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
-    "chinese-lunar-calendar": "^1.0.1",
     "cors": "^2.8.5",
-    "express": "^4.21.2"
+    "express": "^4.21.2",
+    "lunar-calendar": "^0.1.4"
   }
 }
